@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Portfolio OS</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+
+body{
+margin:0;
+font-family:Inter;
+background:#05070c;
+color:#e6e9ef;
+overflow-x:hidden;
+}
+
+/* animated background */
+
+body::before{
+content:'';
+position:fixed;
+width:900px;
+height:900px;
+background:radial-gradient(circle,#3a7bff33,transparent 70%);
+top:-200px;
+left:-200px;
+filter:blur(120px);
+animation:float 18s infinite alternate;
+z-index:0;
+}
+
+@keyframes float{
+0%{transform:translate(0,0)}
+100%{transform:translate(280px,200px)}
+}
+
+/* cursor glow */
+
+.cursor-glow{
+position:fixed;
+width:420px;
+height:420px;
+pointer-events:none;
+background:radial-gradient(circle,#4da3ff22,transparent 70%);
+filter:blur(90px);
+transform:translate(-50%,-50%);
+z-index:0;
+}
+
+/* layout */
+
+.container{
+max-width:1300px;
+margin:auto;
+padding:40px;
+position:relative;
+z-index:1;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:20px;
+}
+
+.card{
+background:rgba(18,22,31,.85);
+backdrop-filter:blur(16px);
+border-radius:18px;
+padding:20px;
+box-shadow:0 15px 60px rgba(0,0,0,.6);
+}
+
+.stat{
+font-size:24px;
+font-weight:600;
+}
+
+/* inputs */
+
+input,select{
+width:100%;
+padding:8px;
+margin-top:6px;
+background:#0e1219;
+border:none;
+color:white;
+border-radius:8px;
+}
+
+button{
+margin-top:10px;
+padding:10px;
+background:#4da3ff;
+border:none;
+border-radius:8px;
+color:white;
+cursor:pointer;
+}
+
+/* holdings table */
+
+#holdings{
+width:100%;
+margin-top:10px;
+}
+
+#holdings tr{
+border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+#holdings td{
+padding:6px 4px;
+font-size:14px;
+}
+
+/* timeline */
+
+#timeline{
+font-size:13px;
+line-height:1.7;
+opacity:.85;
+}
+
+/* quote */
+
+.quote{
+margin-top:40px;
+opacity:.75;
+font-style:italic;
+text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="cursor-glow"></div>
+
+<div class="container">
+
+<h1>Portfolio Dashboard</h1>
+
+<div class="grid">
+
+<div class="card">
+<h3>Total Invested</h3>
+<div class="stat" id="invested">₹0</div>
+</div>
+
+<div class="card">
+<h3>Current Portfolio</h3>
+<div class="stat" id="current">₹0</div>
+<div id="profit"></div>
+</div>
+
+<div class="card">
+<h3>Portfolio Allocation</h3>
+<canvas id="allocationChart" width="300" height="200"></canvas>
+</div>
+
+<div class="card">
+<h3>Holdings</h3>
+<table id="holdings"></table>
+</div>
+
+<div class="card">
+<h3>Monthly Activity</h3>
+<div id="timeline"></div>
+</div>
+
+<div class="card">
+
+<h3>Buy Asset</h3>
+
+<select id="assetType">
+<option value="stock">Stock</option>
+<option value="mf">Mutual Fund (SIP)</option>
+</select>
+
+<input id="name" placeholder="Stock or Fund Name">
+<input id="amount" placeholder="Qty (Stock) or SIP amount">
+<input id="price" placeholder="Buy price / NAV">
+<input id="sipDate" type="date">
+
+<button onclick="buy()">Add</button>
+
+</div>
+
+<div class="card">
+
+<h3>Sell Asset</h3>
+
+<select id="sellAsset"></select>
+<input id="sellQty" placeholder="Qty">
+<input id="sellPrice" placeholder="Sell price">
+
+<button onclick="sell()">Sell</button>
+
+</div>
+
+<div class="card">
+
+<h3>Update Market Price</h3>
+
+<select id="priceAsset"></select>
+<input id="marketPrice" placeholder="Latest price">
+
+<button onclick="updatePrice()">Update</button>
+
+</div>
+
+</div>
+
+<div class="quote" id="quote"></div>
+
+</div>
+
+<script>
+
+/* cursor glow */
+
+const glow=document.querySelector(".cursor-glow")
+
+document.addEventListener("mousemove",e=>{
+glow.style.left=e.clientX+"px"
+glow.style.top=e.clientY+"px"
+})
+
+/* STORAGE */
+
+let stocks = JSON.parse(localStorage.getItem("stocks")) || []
+let funds = JSON.parse(localStorage.getItem("funds")) || []
+let prices = JSON.parse(localStorage.getItem("prices")) || {}
+let timeline = JSON.parse(localStorage.getItem("timeline")) || []
+
+function save(){
+localStorage.setItem("stocks",JSON.stringify(stocks))
+localStorage.setItem("funds",JSON.stringify(funds))
+localStorage.setItem("prices",JSON.stringify(prices))
+localStorage.setItem("timeline",JSON.stringify(timeline))
+render()
+}
+
+/* BUY */
+
+function buy(){
+
+let type=document.getElementById("assetType").value
+let name=document.getElementById("name").value.trim()
+let amount=parseFloat(document.getElementById("amount").value)
+let price=parseFloat(document.getElementById("price").value)
+let sipDate=document.getElementById("sipDate").value
+
+if(!name || isNaN(amount) || isNaN(price)) return
+
+if(type==="stock"){
+stocks.push({name,qty:amount,buy:price})
+timeline.push(`📈 ${name} bought • ${amount} @ ₹${price}`)
+}
+
+if(type==="mf"){
+funds.push({name,sip:amount,start:sipDate})
+timeline.push(`🔁 ${name} SIP started • ₹${amount}`)
+}
+
+save()
+
+}
+
+/* SELL */
+
+function sell(){
+
+let name=document.getElementById("sellAsset").value
+let qty=parseFloat(document.getElementById("sellQty").value)
+let price=parseFloat(document.getElementById("sellPrice").value)
+
+let s=stocks.find(x=>x.name===name)
+if(!s || isNaN(qty)) return
+
+s.qty -= qty
+
+timeline.push(`📉 ${name} sold • ${qty} @ ₹${price}`)
+
+if(s.qty<=0){
+stocks = stocks.filter(x=>x.name!==name)
+}
+
+save()
+
+}
+
+/* PRICE UPDATE */
+
+function updatePrice(){
+
+let name=document.getElementById("priceAsset").value
+let price=parseFloat(document.getElementById("marketPrice").value)
+
+if(isNaN(price)) return
+
+prices[name]=price
+save()
+
+}
+
+/* SIP MONTH CALC */
+
+function monthsPassed(start){
+
+let s=new Date(start)
+let now=new Date()
+
+return (now.getFullYear()-s.getFullYear())*12 + (now.getMonth()-s.getMonth()) + 1
+
+}
+
+/* CHART */
+
+function drawAllocation(stockValue,mfValue){
+
+const canvas=document.getElementById("allocationChart")
+const ctx=canvas.getContext("2d")
+
+const total=stockValue+mfValue
+if(total===0) return
+
+const stockAngle=(stockValue/total)*Math.PI*2
+
+const cx=canvas.width/2
+const cy=canvas.height/2
+const r=80
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+
+/* STOCK */
+
+ctx.beginPath()
+ctx.moveTo(cx,cy)
+ctx.arc(cx,cy,r,0,stockAngle)
+ctx.fillStyle="#4da3ff"
+ctx.fill()
+
+/* MF */
+
+ctx.beginPath()
+ctx.moveTo(cx,cy)
+ctx.arc(cx,cy,r,stockAngle,Math.PI*2)
+ctx.fillStyle="#8b5cf6"
+ctx.fill()
+
+/* donut */
+
+ctx.beginPath()
+ctx.arc(cx,cy,40,0,Math.PI*2)
+ctx.fillStyle="#05070c"
+ctx.fill()
+
+}
+
+/* RENDER */
+
+function render(){
+
+let invested=0
+let current=0
+
+let stockValue=0
+let mfValue=0
+
+let holdingsHTML=""
+
+/* STOCKS */
+
+stocks.forEach(s=>{
+
+let investedStock=s.qty*s.buy
+let market=prices[s.name] || s.buy
+let currentStock=s.qty*market
+
+invested+=investedStock
+current+=currentStock
+stockValue+=currentStock
+
+holdingsHTML += `
+<tr>
+<td style="opacity:.6">STOCK</td>
+<td>${s.name}</td>
+<td style="text-align:right">${s.qty}</td>
+</tr>
+`
+
+})
+
+/* FUNDS */
+
+funds.forEach(f=>{
+
+let m=monthsPassed(f.start)
+let investedMF=m*f.sip
+
+invested+=investedMF
+current+=investedMF
+mfValue+=investedMF
+
+holdingsHTML += `
+<tr>
+<td style="opacity:.6">MF</td>
+<td>${f.name}</td>
+<td style="text-align:right">₹${investedMF}</td>
+</tr>
+`
+
+})
+
+document.getElementById("holdings").innerHTML=holdingsHTML
+
+document.getElementById("invested").innerText="₹"+invested.toFixed(2)
+document.getElementById("current").innerText="₹"+current.toFixed(2)
+
+let pl=current-invested
+let color=pl>=0?"#4ade80":"#ff5c7a"
+
+document.getElementById("profit").innerHTML=`<span style="color:${color}">P/L ₹${pl.toFixed(2)}</span>`
+
+document.getElementById("sellAsset").innerHTML=
+stocks.map(s=>`<option>${s.name}</option>`).join("")
+
+document.getElementById("priceAsset").innerHTML=
+[...stocks.map(s=>s.name),...funds.map(f=>f.name)]
+.map(x=>`<option>${x}</option>`).join("")
+
+document.getElementById("timeline").innerHTML=timeline.slice().reverse().join("<br>")
+
+drawAllocation(stockValue,mfValue)
+
+}
+
+/* QUOTES */
+
+const quotes=[
+"Compounding is just patience wearing a lab coat.",
+"SIP is the financial version of gravity.",
+"Your future self is quietly cheering every SIP.",
+"Markets panic. Compounding does not.",
+"Every rupee invested is a tiny employee working forever."
+]
+
+document.getElementById("quote").innerText =
+quotes[Math.floor(Math.random()*quotes.length)]
+
+render()
+
+</script>
+
+</body>
+</html>
