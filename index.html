@@ -20,40 +20,29 @@ color:#e6e9ef;
 overflow-x:hidden;
 }
 
-/* animated background */
+/* LIVE ANIMATED WALLPAPER */
 
 body::before{
 content:'';
 position:fixed;
-width:900px;
-height:900px;
-background:radial-gradient(circle,#3a7bff33,transparent 70%);
-top:-200px;
-left:-200px;
+width:200%;
+height:200%;
+top:-50%;
+left:-50%;
+background:
+radial-gradient(circle at 20% 30%, #3a7bff33 0%, transparent 40%),
+radial-gradient(circle at 80% 60%, #8b5cf633 0%, transparent 40%),
+radial-gradient(circle at 50% 80%, #22c55e22 0%, transparent 40%);
+animation:nebula 40s linear infinite;
 filter:blur(120px);
-animation:float 18s infinite alternate;
 z-index:0;
 }
 
-@keyframes float{
-0%{transform:translate(0,0)}
-100%{transform:translate(280px,200px)}
+@keyframes nebula{
+0%{transform:translate(0px,0px) rotate(0deg)}
+50%{transform:translate(-200px,100px) rotate(180deg)}
+100%{transform:translate(0px,0px) rotate(360deg)}
 }
-
-/* cursor glow */
-
-.cursor-glow{
-position:fixed;
-width:420px;
-height:420px;
-pointer-events:none;
-background:radial-gradient(circle,#4da3ff22,transparent 70%);
-filter:blur(90px);
-transform:translate(-50%,-50%);
-z-index:0;
-}
-
-/* layout */
 
 .container{
 max-width:1300px;
@@ -82,8 +71,6 @@ font-size:24px;
 font-weight:600;
 }
 
-/* inputs */
-
 input,select{
 width:100%;
 padding:8px;
@@ -104,8 +91,6 @@ color:white;
 cursor:pointer;
 }
 
-/* holdings table */
-
 #holdings{
 width:100%;
 margin-top:10px;
@@ -120,15 +105,11 @@ padding:6px 4px;
 font-size:14px;
 }
 
-/* timeline */
-
 #timeline{
 font-size:13px;
 line-height:1.7;
 opacity:.85;
 }
-
-/* quote */
 
 .quote{
 margin-top:40px;
@@ -142,8 +123,6 @@ text-align:center;
 </head>
 
 <body>
-
-<div class="cursor-glow"></div>
 
 <div class="container">
 
@@ -207,17 +186,6 @@ text-align:center;
 
 </div>
 
-<div class="card">
-
-<h3>Update Market Price</h3>
-
-<select id="priceAsset"></select>
-<input id="marketPrice" placeholder="Latest price">
-
-<button onclick="updatePrice()">Update</button>
-
-</div>
-
 </div>
 
 <div class="quote" id="quote"></div>
@@ -226,21 +194,29 @@ text-align:center;
 
 <script>
 
-/* cursor glow */
+/* DEFAULT PORTFOLIO */
 
-const glow=document.querySelector(".cursor-glow")
+const defaultStocks=[
+{name:"ITC",qty:1,buy:306.60,date:"2026-03-10"}
+]
 
-document.addEventListener("mousemove",e=>{
-glow.style.left=e.clientX+"px"
-glow.style.top=e.clientY+"px"
-})
+const defaultFunds=[
+{name:"UTI NIFTY 50",sip:1300,start:"2026-03-10"},
+{name:"ICICI PRU NEXT 50",sip:600,start:"2026-03-10"},
+{name:"NIPPON INDIA MULTICAP",sip:200,start:"2026-03-10"}
+]
 
-/* STORAGE */
+const defaultTimeline=[
+"📈 ITC bought • 1 @ ₹306.60 • 10 Mar 2026",
+"🔁 UTI NIFTY 50 SIP started • ₹1300 • 10 Mar 2026",
+"🔁 ICICI PRU NEXT 50 SIP started • ₹600 • 10 Mar 2026",
+"🔁 NIPPON INDIA MULTICAP SIP started • ₹200 • 10 Mar 2026"
+]
 
-let stocks = JSON.parse(localStorage.getItem("stocks")) || []
-let funds = JSON.parse(localStorage.getItem("funds")) || []
-let prices = JSON.parse(localStorage.getItem("prices")) || {}
-let timeline = JSON.parse(localStorage.getItem("timeline")) || []
+let stocks=JSON.parse(localStorage.getItem("stocks"))||defaultStocks
+let funds=JSON.parse(localStorage.getItem("funds"))||defaultFunds
+let prices=JSON.parse(localStorage.getItem("prices"))||{}
+let timeline=JSON.parse(localStorage.getItem("timeline"))||defaultTimeline
 
 function save(){
 localStorage.setItem("stocks",JSON.stringify(stocks))
@@ -255,7 +231,7 @@ render()
 function buy(){
 
 let type=document.getElementById("assetType").value
-let name=document.getElementById("name").value.trim()
+let name=document.getElementById("name").value.trim().toUpperCase()
 let amount=parseFloat(document.getElementById("amount").value)
 let price=parseFloat(document.getElementById("price").value)
 let sipDate=document.getElementById("sipDate").value
@@ -285,30 +261,16 @@ let qty=parseFloat(document.getElementById("sellQty").value)
 let price=parseFloat(document.getElementById("sellPrice").value)
 
 let s=stocks.find(x=>x.name===name)
-if(!s || isNaN(qty)) return
+if(!s||isNaN(qty)) return
 
-s.qty -= qty
+s.qty-=qty
 
 timeline.push(`📉 ${name} sold • ${qty} @ ₹${price}`)
 
 if(s.qty<=0){
-stocks = stocks.filter(x=>x.name!==name)
+stocks=stocks.filter(x=>x.name!==name)
 }
 
-save()
-
-}
-
-/* PRICE UPDATE */
-
-function updatePrice(){
-
-let name=document.getElementById("priceAsset").value
-let price=parseFloat(document.getElementById("marketPrice").value)
-
-if(isNaN(price)) return
-
-prices[name]=price
 save()
 
 }
@@ -320,11 +282,42 @@ function monthsPassed(start){
 let s=new Date(start)
 let now=new Date()
 
-return (now.getFullYear()-s.getFullYear())*12 + (now.getMonth()-s.getMonth()) + 1
+return (now.getFullYear()-s.getFullYear())*12+(now.getMonth()-s.getMonth())+1
 
 }
 
-/* CHART */
+/* LIVE STOCK PRICES */
+
+async function fetchPrices(){
+
+if(stocks.length===0) return
+
+let symbols=stocks.map(s=>s.name+".NS").join(",")
+
+let url="https://query1.finance.yahoo.com/v7/finance/quote?symbols="+symbols
+let proxy="https://api.allorigins.win/raw?url="+encodeURIComponent(url)
+
+try{
+
+let res=await fetch(proxy)
+let data=await res.json()
+
+data.quoteResponse.result.forEach(q=>{
+let name=q.symbol.replace(".NS","")
+prices[name]=q.regularMarketPrice
+})
+
+save()
+
+}catch(e){
+
+console.log("price update failed")
+
+}
+
+}
+
+/* ALLOCATION CHART */
 
 function drawAllocation(stockValue,mfValue){
 
@@ -342,23 +335,17 @@ const r=80
 
 ctx.clearRect(0,0,canvas.width,canvas.height)
 
-/* STOCK */
-
 ctx.beginPath()
 ctx.moveTo(cx,cy)
 ctx.arc(cx,cy,r,0,stockAngle)
 ctx.fillStyle="#4da3ff"
 ctx.fill()
 
-/* MF */
-
 ctx.beginPath()
 ctx.moveTo(cx,cy)
 ctx.arc(cx,cy,r,stockAngle,Math.PI*2)
 ctx.fillStyle="#8b5cf6"
 ctx.fill()
-
-/* donut */
 
 ctx.beginPath()
 ctx.arc(cx,cy,40,0,Math.PI*2)
@@ -379,19 +366,17 @@ let mfValue=0
 
 let holdingsHTML=""
 
-/* STOCKS */
-
 stocks.forEach(s=>{
 
 let investedStock=s.qty*s.buy
-let market=prices[s.name] || s.buy
+let market=prices[s.name]||s.buy
 let currentStock=s.qty*market
 
 invested+=investedStock
 current+=currentStock
 stockValue+=currentStock
 
-holdingsHTML += `
+holdingsHTML+=`
 <tr>
 <td style="opacity:.6">STOCK</td>
 <td>${s.name}</td>
@@ -400,8 +385,6 @@ holdingsHTML += `
 `
 
 })
-
-/* FUNDS */
 
 funds.forEach(f=>{
 
@@ -412,7 +395,7 @@ invested+=investedMF
 current+=investedMF
 mfValue+=investedMF
 
-holdingsHTML += `
+holdingsHTML+=`
 <tr>
 <td style="opacity:.6">MF</td>
 <td>${f.name}</td>
@@ -435,27 +418,24 @@ document.getElementById("profit").innerHTML=`<span style="color:${color}">P/L �
 document.getElementById("sellAsset").innerHTML=
 stocks.map(s=>`<option>${s.name}</option>`).join("")
 
-document.getElementById("priceAsset").innerHTML=
-[...stocks.map(s=>s.name),...funds.map(f=>f.name)]
-.map(x=>`<option>${x}</option>`).join("")
-
-document.getElementById("timeline").innerHTML=timeline.slice().reverse().join("<br>")
+document.getElementById("timeline").innerHTML=
+timeline.slice().reverse().slice(0,15).join("<br>")
 
 drawAllocation(stockValue,mfValue)
 
 }
 
-/* QUOTES */
+fetchPrices()
+setInterval(fetchPrices,300000)
 
 const quotes=[
 "Compounding is just patience wearing a lab coat.",
 "SIP is the financial version of gravity.",
 "Your future self is quietly cheering every SIP.",
-"Markets panic. Compounding does not.",
-"Every rupee invested is a tiny employee working forever."
+"Markets panic. Compounding does not."
 ]
 
-document.getElementById("quote").innerText =
+document.getElementById("quote").innerText=
 quotes[Math.floor(Math.random()*quotes.length)]
 
 render()
