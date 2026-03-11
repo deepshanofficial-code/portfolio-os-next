@@ -20,7 +20,7 @@ color:#e6e9ef;
 overflow-x:hidden;
 }
 
-/* LIVE ANIMATED WALLPAPER */
+/* LIVE WALLPAPER */
 
 body::before{
 content:'';
@@ -91,18 +91,20 @@ color:white;
 cursor:pointer;
 }
 
+/* holdings table */
+
 #holdings{
 width:100%;
 margin-top:10px;
 }
 
-#holdings tr{
-border-bottom:1px solid rgba(255,255,255,.06);
-}
-
 #holdings td{
 padding:6px 4px;
 font-size:14px;
+}
+
+#holdings tr{
+border-bottom:1px solid rgba(255,255,255,.06);
 }
 
 #timeline{
@@ -139,6 +141,7 @@ text-align:center;
 <h3>Current Portfolio</h3>
 <div class="stat" id="current">₹0</div>
 <div id="profit"></div>
+<div id="lastUpdate" style="opacity:.6;font-size:12px;margin-top:6px"></div>
 </div>
 
 <div class="card">
@@ -148,7 +151,24 @@ text-align:center;
 
 <div class="card">
 <h3>Holdings</h3>
-<table id="holdings"></table>
+
+<table id="holdings">
+
+<thead>
+<tr style="opacity:.6">
+<td>TYPE</td>
+<td>ASSET</td>
+<td>QTY</td>
+<td>BUY</td>
+<td>TODAY</td>
+<td>P/L</td>
+</tr>
+</thead>
+
+<tbody id="holdingsBody"></tbody>
+
+</table>
+
 </div>
 
 <div class="card">
@@ -275,7 +295,7 @@ save()
 
 }
 
-/* SIP MONTH CALC */
+/* SIP CALC */
 
 function monthsPassed(start){
 
@@ -286,7 +306,7 @@ return (now.getFullYear()-s.getFullYear())*12+(now.getMonth()-s.getMonth())+1
 
 }
 
-/* LIVE STOCK PRICES */
+/* LIVE PRICE FETCH */
 
 async function fetchPrices(){
 
@@ -303,9 +323,14 @@ let res=await fetch(proxy)
 let data=await res.json()
 
 data.quoteResponse.result.forEach(q=>{
+
 let name=q.symbol.replace(".NS","")
 prices[name]=q.regularMarketPrice
+
 })
+
+document.getElementById("lastUpdate").innerText=
+"Last market update: "+new Date().toLocaleTimeString()
 
 save()
 
@@ -360,17 +385,19 @@ function render(){
 
 let invested=0
 let current=0
-
 let stockValue=0
 let mfValue=0
-
 let holdingsHTML=""
+
+/* STOCKS */
 
 stocks.forEach(s=>{
 
 let investedStock=s.qty*s.buy
 let market=prices[s.name]||s.buy
 let currentStock=s.qty*market
+let pl=currentStock-investedStock
+let color=pl>=0?"#4ade80":"#ff5c7a"
 
 invested+=investedStock
 current+=currentStock
@@ -380,11 +407,16 @@ holdingsHTML+=`
 <tr>
 <td style="opacity:.6">STOCK</td>
 <td>${s.name}</td>
-<td style="text-align:right">${s.qty}</td>
+<td>${s.qty}</td>
+<td>₹${s.buy.toFixed(2)}</td>
+<td>₹${market.toFixed(2)}</td>
+<td style="color:${color}">₹${pl.toFixed(2)}</td>
 </tr>
 `
 
 })
+
+/* FUNDS */
 
 funds.forEach(f=>{
 
@@ -399,13 +431,16 @@ holdingsHTML+=`
 <tr>
 <td style="opacity:.6">MF</td>
 <td>${f.name}</td>
-<td style="text-align:right">₹${investedMF}</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>₹${investedMF}</td>
 </tr>
 `
 
 })
 
-document.getElementById("holdings").innerHTML=holdingsHTML
+document.getElementById("holdingsBody").innerHTML=holdingsHTML
 
 document.getElementById("invested").innerText="₹"+invested.toFixed(2)
 document.getElementById("current").innerText="₹"+current.toFixed(2)
@@ -425,14 +460,18 @@ drawAllocation(stockValue,mfValue)
 
 }
 
+/* AUTO PRICE REFRESH */
+
 fetchPrices()
 setInterval(fetchPrices,300000)
+
+/* QUOTES */
 
 const quotes=[
 "Compounding is just patience wearing a lab coat.",
 "SIP is the financial version of gravity.",
-"Your future self is quietly cheering every SIP.",
-"Markets panic. Compounding does not."
+"Markets panic. Compounding does not.",
+"Every rupee invested is a tiny employee working forever."
 ]
 
 document.getElementById("quote").innerText=
